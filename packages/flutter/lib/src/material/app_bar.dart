@@ -277,8 +277,8 @@ class AppBar extends StatefulWidget implements PreferredSizeWidget {
   /// {@template flutter.material.appbar.automaticallyImplyLeading}
   /// Controls whether we should try to imply the leading widget if null.
   ///
-  /// If true and [leading] is null, automatically try to deduce what the leading
-  /// widget should be. If false and [leading] is null, leading space is given to [title].
+  /// If true and [AppBar.leading] is null, automatically try to deduce what the leading
+  /// widget should be. If false and [AppBar.leading] is null, leading space is given to [AppBar.title].
   /// If leading widget is not null, this parameter has no effect.
   /// {@endtemplate}
   final bool automaticallyImplyLeading;
@@ -489,9 +489,13 @@ class AppBar extends StatefulWidget implements PreferredSizeWidget {
   /// The fill color to use for an app bar's [Material].
   ///
   /// If null, then the [AppBarTheme.backgroundColor] is used. If that value is also
-  /// null, then [AppBar] uses the overall theme's [ColorScheme.primary] if the
+  /// null:
+  /// In Material v2 (i.e., when [ThemeData.useMaterial3] is false),
+  /// then [AppBar] uses the overall theme's [ColorScheme.primary] if the
   /// overall theme's brightness is [Brightness.light], and [ColorScheme.surface]
   /// if the overall theme's brightness is [Brightness.dark].
+  /// In Material v3 (i.e., when [ThemeData.useMaterial3] is true),
+  /// then [AppBar] uses the overall theme's [ColorScheme.surface]
   ///
   /// If this color is a [MaterialStateColor] it will be resolved against
   /// [MaterialState.scrolledUnder] when the content of the app's
@@ -514,10 +518,13 @@ class AppBar extends StatefulWidget implements PreferredSizeWidget {
   /// The default color for [Text] and [Icon]s within the app bar.
   ///
   /// If null, then [AppBarTheme.foregroundColor] is used. If that
-  /// value is also null, then [AppBar] uses the overall theme's
-  /// [ColorScheme.onPrimary] if the overall theme's brightness is
-  /// [Brightness.light], and [ColorScheme.onSurface] if the overall
-  /// theme's brightness is [Brightness.dark].
+  /// value is also null:
+  /// In Material v2 (i.e., when [ThemeData.useMaterial3] is false),
+  /// then [AppBar] uses the overall theme's [ColorScheme.onPrimary] if the
+  /// overall theme's brightness is [Brightness.light], and [ColorScheme.onSurface]
+  /// if the overall theme's brightness is [Brightness.dark].
+  /// In Material v3 (i.e., when [ThemeData.useMaterial3] is true),
+  /// then [AppBar] uses the overall theme's [ColorScheme.onSurface].
   ///
   /// This color is used to configure [DefaultTextStyle] that contains
   /// the toolbar's children, and the default [IconTheme] widgets that
@@ -642,9 +649,9 @@ class AppBar extends StatefulWidget implements PreferredSizeWidget {
   final double? toolbarHeight;
 
   /// {@template flutter.material.appbar.leadingWidth}
-  /// Defines the width of [leading] widget.
+  /// Defines the width of [AppBar.leading] widget.
   ///
-  /// By default, the value of [leadingWidth] is 56.0.
+  /// By default, the value of [AppBar.leadingWidth] is 56.0.
   /// {@endtemplate}
   final double? leadingWidth;
 
@@ -841,6 +848,17 @@ class _AppBarState extends State<AppBar> {
       defaults.backgroundColor!,
     );
 
+    final Color scrolledUnderBackground = _resolveColor(
+      states,
+      widget.backgroundColor,
+      appBarTheme.backgroundColor,
+      Theme.of(context).colorScheme.surfaceContainer,
+    );
+
+    final Color effectiveBackgroundColor = states.contains(MaterialState.scrolledUnder)
+        ? scrolledUnderBackground
+        : backgroundColor;
+
     final Color foregroundColor = widget.foregroundColor
       ?? appBarTheme.foregroundColor
       ?? defaults.foregroundColor!;
@@ -951,22 +969,13 @@ class _AppBarState extends State<AppBar> {
 
     Widget? title = widget.title;
     if (title != null) {
-      bool? namesRoute;
-      switch (theme.platform) {
-        case TargetPlatform.android:
-        case TargetPlatform.fuchsia:
-        case TargetPlatform.linux:
-        case TargetPlatform.windows:
-          namesRoute = true;
-        case TargetPlatform.iOS:
-        case TargetPlatform.macOS:
-          break;
-      }
-
       title = _AppBarTitleBox(child: title);
       if (!widget.excludeHeaderSemantics) {
         title = Semantics(
-          namesRoute: namesRoute,
+          namesRoute: switch (theme.platform) {
+            TargetPlatform.android || TargetPlatform.fuchsia || TargetPlatform.linux || TargetPlatform.windows => true,
+            TargetPlatform.iOS || TargetPlatform.macOS => null,
+          },
           header: true,
           child: title,
         );
@@ -982,16 +991,9 @@ class _AppBarState extends State<AppBar> {
       // Set maximum text scale factor to [_kMaxTitleTextScaleFactor] for the
       // title to keep the visual hierarchy the same even with larger font
       // sizes. To opt out, wrap the [title] widget in a [MediaQuery] widget
-      // with [MediaQueryData.textScaleFactor] set to
-      // `MediaQuery.textScaleFactorOf(context)`.
-      final MediaQueryData mediaQueryData = MediaQuery.of(context);
-      title = MediaQuery(
-        data: mediaQueryData.copyWith(
-          textScaleFactor: math.min(
-            mediaQueryData.textScaleFactor,
-            _kMaxTitleTextScaleFactor,
-          ),
-        ),
+      // with a different `TextScaler`.
+      title = MediaQuery.withClampedTextScaling(
+        maxScaleFactor: _kMaxTitleTextScaleFactor,
         child: title,
       );
     }
@@ -1122,7 +1124,7 @@ class _AppBarState extends State<AppBar> {
       ?? appBarTheme.systemOverlayStyle
       ?? defaults.systemOverlayStyle
       ?? _systemOverlayStyleForBrightness(
-        ThemeData.estimateBrightnessForColor(backgroundColor),
+        ThemeData.estimateBrightnessForColor(effectiveBackgroundColor),
         // Make the status bar transparent for M3 so the elevation overlay
         // color is picked up by the statusbar.
         theme.useMaterial3 ? const Color(0x00000000) : null,
@@ -1133,7 +1135,7 @@ class _AppBarState extends State<AppBar> {
       child: AnnotatedRegion<SystemUiOverlayStyle>(
         value: overlayStyle,
         child: Material(
-          color: backgroundColor,
+          color: theme.useMaterial3 ? effectiveBackgroundColor : backgroundColor,
           elevation: effectiveElevation,
           type: widget.forceMaterialTransparency
               ? MaterialType.transparency
@@ -1143,7 +1145,10 @@ class _AppBarState extends State<AppBar> {
             ?? defaults.shadowColor,
           surfaceTintColor: widget.surfaceTintColor
             ?? appBarTheme.surfaceTintColor
-            ?? defaults.surfaceTintColor,
+            // M3 `defaults.surfaceTint` is Colors.transparent now. It is not used
+            // here because otherwise, it will cause breaking change for
+            // `scrolledUnderElevation`.
+            ?? (theme.useMaterial3 ? theme.colorScheme.surfaceTint : null),
           shape: widget.shape ?? appBarTheme.shape ?? defaults.shape,
           child: Semantics(
             explicitChildNodes: true,
@@ -1277,6 +1282,7 @@ class _SliverAppBarDelegate extends SliverPersistentHeaderDelegate {
       currentExtent: math.max(minExtent, maxExtent - shrinkOffset),
       toolbarOpacity: toolbarOpacity,
       isScrolledUnder: isScrolledUnder,
+      hasLeading: leading != null || automaticallyImplyLeading,
       child: AppBar(
         clipBehavior: clipBehavior,
         leading: leading,
@@ -1451,9 +1457,6 @@ class _SliverAppBarDelegate extends SliverPersistentHeaderDelegate {
 ///  * <https://material.io/design/components/app-bars-top.html>
 class SliverAppBar extends StatefulWidget {
   /// Creates a Material Design app bar that can be placed in a [CustomScrollView].
-  ///
-  /// The arguments [forceElevated], [primary], [floating], [pinned], [snap]
-  /// and [automaticallyImplyLeading] must not be null.
   const SliverAppBar({
     super.key,
     this.leading,
@@ -2098,7 +2101,6 @@ class _ScrollUnderFlexibleSpace extends StatelessWidget {
   Widget build(BuildContext context) {
     late final AppBarTheme appBarTheme = AppBarTheme.of(context);
     late final AppBarTheme defaults = Theme.of(context).useMaterial3 ? _AppBarDefaultsM3(context) : _AppBarDefaultsM2(context);
-    final double textScaleFactor = math.min(MediaQuery.textScaleFactorOf(context), _kMaxTitleTextScaleFactor); // TODO(tahatesser): Add link to Material spec when available, https://github.com/flutter/flutter/issues/58769.
     final FlexibleSpaceBarSettings settings = context.dependOnInheritedWidgetOfExactType<FlexibleSpaceBarSettings>()!;
     final _ScrollUnderFlexibleConfig config = configBuilder(context);
     assert(
@@ -2125,10 +2127,10 @@ class _ScrollUnderFlexibleSpace extends StatelessWidget {
     // Set maximum text scale factor to [_kMaxTitleTextScaleFactor] for the
     // title to keep the visual hierarchy the same even with larger font
     // sizes. To opt out, wrap the [title] widget in a [MediaQuery] widget
-    // with [MediaQueryData.textScaleFactor] set to
-    // `MediaQuery.textScaleFactorOf(context)`.
-    return MediaQuery(
-      data: MediaQuery.of(context).copyWith(textScaleFactor: textScaleFactor),
+    // with a different TextScaler.
+    // TODO(tahatesser): Add link to Material spec when available, https://github.com/flutter/flutter/issues/58769.
+    return MediaQuery.withClampedTextScaling(
+      maxScaleFactor: _kMaxTitleTextScaleFactor,
       // This column will assume the full height of the parent Stack.
       child: Column(
         children: <Widget>[
@@ -2271,14 +2273,14 @@ class _RenderExpandedTitleBox extends RenderShiftedBox {
 
     assert(padding.isNonNegative);
     assert(titleAlignment.y == 1.0);
-    // yAdjustement is the minimum additional y offset to shift the child in
+    // yAdjustment is the minimum additional y offset to shift the child in
     // the visible vertical space when AppBar is fully expanded. The goal is to
     // prevent the expanded title from being clipped when the expanded title
     // widget + the bottom padding is too tall to fit in the flexible space (the
     // top padding is basically ignored since the expanded title is
     // bottom-aligned).
-    final double yAdjustement = clampDouble(childSize.height + padding.bottom - maxExtent, 0, padding.bottom);
-    final double offsetY = size.height - childSize.height - padding.bottom + yAdjustement;
+    final double yAdjustment = clampDouble(childSize.height + padding.bottom - maxExtent, 0, padding.bottom);
+    final double offsetY = size.height - childSize.height - padding.bottom + yAdjustment;
     final double offsetX = (titleAlignment.x + 1) / 2 * (size.width - padding.horizontal - childSize.width) + padding.left;
 
     final BoxParentData childParentData = child.parentData! as BoxParentData;
@@ -2353,7 +2355,7 @@ class _AppBarDefaultsM3 extends AppBarTheme {
   Color? get shadowColor => Colors.transparent;
 
   @override
-  Color? get surfaceTintColor => _colors.surfaceTint;
+  Color? get surfaceTintColor => Colors.transparent;
 
   @override
   IconThemeData? get iconTheme => IconThemeData(

@@ -27,8 +27,6 @@ import 'sliver_fixed_extent_list.dart';
 class RenderSliverFillViewport extends RenderSliverFixedExtentBoxAdaptor {
   /// Creates a sliver that contains multiple box children that each fill the
   /// viewport.
-  ///
-  /// The [childManager] argument must not be null.
   RenderSliverFillViewport({
     required super.childManager,
     double viewportFraction = 1.0,
@@ -140,13 +138,10 @@ class RenderSliverFillRemaining extends RenderSliverSingleBoxAdapter {
     double extent = constraints.viewportMainAxisExtent - constraints.precedingScrollExtent;
 
     if (child != null) {
-      final double childExtent;
-      switch (constraints.axis) {
-        case Axis.horizontal:
-          childExtent = child!.getMaxIntrinsicWidth(constraints.crossAxisExtent);
-        case Axis.vertical:
-          childExtent = child!.getMaxIntrinsicHeight(constraints.crossAxisExtent);
-      }
+      final double childExtent = switch (constraints.axis) {
+        Axis.horizontal => child!.getMaxIntrinsicWidth(constraints.crossAxisExtent),
+        Axis.vertical  => child!.getMaxIntrinsicHeight(constraints.crossAxisExtent),
+      };
 
       // If the childExtent is greater than the computed extent, we want to use
       // that instead of potentially cutting off the child. This allows us to
@@ -215,13 +210,10 @@ class RenderSliverFillRemainingAndOverscroll extends RenderSliverSingleBoxAdapte
     double maxExtent = constraints.remainingPaintExtent - math.min(constraints.overlap, 0.0);
 
     if (child != null) {
-      final double childExtent;
-      switch (constraints.axis) {
-        case Axis.horizontal:
-          childExtent = child!.getMaxIntrinsicWidth(constraints.crossAxisExtent);
-        case Axis.vertical:
-          childExtent = child!.getMaxIntrinsicHeight(constraints.crossAxisExtent);
-      }
+      final double childExtent = switch (constraints.axis) {
+        Axis.horizontal => child!.getMaxIntrinsicWidth(constraints.crossAxisExtent),
+        Axis.vertical  => child!.getMaxIntrinsicHeight(constraints.crossAxisExtent),
+      };
 
       // If the childExtent is greater than the computed extent, we want to use
       // that instead of potentially cutting off the child. This allows us to

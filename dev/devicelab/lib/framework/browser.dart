@@ -87,6 +87,10 @@ class Chrome {
       print('Launching Chrome...');
     }
 
+    final String jsFlags = options.enableWasmGC ? <String>[
+      '--experimental-wasm-gc',
+      '--experimental-wasm-type-reflection',
+    ].join(' ') : '';
     final bool withDebugging = options.debugPort != null;
     final List<String> args = <String>[
       if (options.userDataDirectory != null)
@@ -108,8 +112,7 @@ class Chrome {
       '--no-default-browser-check',
       '--disable-default-apps',
       '--disable-translate',
-      if (options.enableWasmGC)
-        '--js-flags=--experimental-wasm-gc',
+      if (jsFlags.isNotEmpty) '--js-flags=$jsFlags',
     ];
 
     final io.Process chromeProcess = await _spawnChromiumProcess(
@@ -569,12 +572,7 @@ class BlinkTraceEvent {
 /// Returns null if the value is null.
 int? _readInt(Map<String, dynamic> json, String key) {
   final num? jsonValue = json[key] as num?;
-
-  if (jsonValue == null) {
-    return null;
-  }
-
-  return jsonValue.toInt();
+  return jsonValue?.toInt();
 }
 
 /// Used by [Chrome.launch] to detect a glibc bug and retry launching the
